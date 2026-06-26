@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   loginWithEmail,
-  sendFirebaseReset,
   signInWithGoogle,
 } from '@/lib/auth';
 
@@ -487,7 +486,7 @@ export default function LoginPage() {
         return;
       }
 
-      const cred = await loginWithEmail(email, password);
+      const cred = await loginWithEmail(loginId, password);
 
       const firebaseEmail = cred.user.email?.trim().toLowerCase() || email.trim().toLowerCase();
       const firebaseName = cred.user.displayName || null;
@@ -536,7 +535,8 @@ export default function LoginPage() {
       if (
         code === 'auth/user-not-found' ||
         code === 'auth/wrong-password' ||
-        code === 'auth/invalid-credential'
+        code === 'auth/invalid-credential' ||
+        code === 'auth/invalid-email'
       ) {
         setLoginError('Invalid email or password.');
       } else {
@@ -661,15 +661,18 @@ export default function LoginPage() {
     setForgotError('');
     setForgotLoading(true);
     try {
-      await sendFirebaseReset(forgotEmail);
+      const res = await fetch('/api/auth/send-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.message || 'Failed to send reset email.');
+      }
       setForgotSuccess(true);
     } catch (e) {
-      const code = (e as { code?: string })?.code;
-      if (code === 'auth/user-not-found') {
-        setForgotError('No account found with that email.');
-      } else {
-        setForgotError(e instanceof Error ? e.message : 'Something went wrong.');
-      }
+      setForgotError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
       setForgotLoading(false);
     }
@@ -1248,6 +1251,9 @@ export default function LoginPage() {
                     }}
                   >
                     ✓ Recovery email sent to <strong>{forgotEmail}</strong>
+                    <div style={{ marginTop: 8, color: 'rgba(213,252,67,.65)', fontSize: 12 }}>
+                      Don&apos;t see it? Check your spam or junk folder — it may take a minute to arrive.
+                    </div>
                   </div>
                   <button type="button" className="lp-btn" onClick={closeForgot}>
                     Back to login
