@@ -20,8 +20,14 @@ export async function signOutAndClear(): Promise<void> {
 }
 
 export async function validateSession(): Promise<boolean> {
+  // Local mode has no DB or real Firebase users — skip all validation
+  if (process.env.NEXT_PUBLIC_DATABASE_MODE === 'local') return true;
+
   const storedUid = localStorage.getItem('firebase_uid');
   if (!storedUid) return false;
+
+  // testuser is a dev bypass with no real Firebase account
+  if (storedUid === 'testuser') return true;
 
   const firebaseUser = await new Promise<User | null>(resolve => {
     const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user); });
