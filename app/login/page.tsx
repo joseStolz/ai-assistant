@@ -431,6 +431,25 @@ export default function LoginPage() {
     return json.user;
   }
 
+  async function safeUpsertPrismaUser(payload: {
+    email: string;
+    name?: string | null;
+    avatarUrl?: string | null;
+    firebaseUid?: string;
+  }) {
+    try {
+      await upsertPrismaUser(payload);
+    } catch (err) {
+      console.error('upsertPrismaUser failed, continuing with local-only session:', err);
+      const uid = payload.firebaseUid ?? payload.email;
+      localStorage.setItem('prisma_user_id', `local-${uid}`);
+      localStorage.setItem('prisma_user_email', payload.email);
+      localStorage.setItem('firebase_uid', uid);
+      if (payload.name) localStorage.setItem('prisma_user_name', payload.name);
+      if (payload.avatarUrl) localStorage.setItem('prisma_user_avatar', payload.avatarUrl);
+    }
+  }
+
   async function createAndSend2FA(targetEmail: string) {
     setSending2FA(true);
     setTwoFAError('');
@@ -474,7 +493,7 @@ export default function LoginPage() {
       const loginId = email.trim().toLowerCase();
       if (loginId === 'testuser') {
         setPstate('exploding');
-        await upsertPrismaUser({
+        await safeUpsertPrismaUser({
           email: 'testuser',
           name: 'testuser',
           avatarUrl: null,
@@ -504,7 +523,7 @@ export default function LoginPage() {
 
       if (readTrustedEmail() === firebaseEmail) {
         setPstate('exploding');
-        await upsertPrismaUser({
+        await safeUpsertPrismaUser({
           email: firebaseEmail,
           name: firebaseName,
           avatarUrl: firebaseAvatar,
@@ -521,7 +540,7 @@ export default function LoginPage() {
       // await createAndSend2FA(firebaseEmail);
       // setShow2FA(true);
       setPstate('exploding');
-      await upsertPrismaUser({
+      await safeUpsertPrismaUser({
         email: firebaseEmail,
         name: firebaseName,
         avatarUrl: firebaseAvatar,
@@ -560,7 +579,7 @@ export default function LoginPage() {
         throw new Error('Google account did not return an email.');
       }
 
-      await upsertPrismaUser({
+      await safeUpsertPrismaUser({
         email: firebaseEmail,
         name: cred.user.displayName || null,
         avatarUrl: cred.user.photoURL || null,

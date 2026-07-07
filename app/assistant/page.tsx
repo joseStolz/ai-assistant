@@ -14,6 +14,7 @@ import HabitsPanel from './components/HabitsPanel';
 import RemindersPanel from './components/RemindersPanel';
 import ActivityLogPanel from './components/ActivityLogPanel';
 import ChecklistsPanel from './components/ChecklistsPanel';
+import SettingsPanel from './components/SettingsPanel';
 import { assistantThemes, getAssistantThemeVars, type AssistantThemeName } from './_theme/themes';
 import classes from './_theme/themes.module.css';
 import { PivotPanel, buildPrunedPivotTree, buildListPivotTree, type PivotTreeRow } from './components/Pivot';
@@ -49,6 +50,7 @@ export default function App() {
   const [remindersOpen, setRemindersOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [listsOpen, setListsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [pivotInstances, setPivotInstances] = useState<
     Array<{ id: string; word: string; listId?: string }>
   >([]);
@@ -754,12 +756,15 @@ export default function App() {
           onToggleActivity={toggleActivity}
           onToggleLists={toggleLists}
           onToggleChat={() => (chatOpen ? closeChatOverlay() : openChatOverlay())}
+          onOpenSettings={() => setSettingsOpen(true)}
           habitsOpen={habitsOpen}
           remindersOpen={remindersOpen}
           activityOpen={activityOpen}
           listsOpen={listsOpen}
           chatOpen={chatOpen}
         />
+
+        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
         {chatOpen && (
           <>

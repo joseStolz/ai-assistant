@@ -1897,3 +1897,81 @@ export function moveChecklistItem(
     l.id === listId ? { ...l, items: arrayMove(l.items, fromIndex, toIndex) } : l,
   );
 }
+
+/* ===================== Backup — export / import ===================== */
+
+export type BackupData = {
+  version: number;
+  exportedAt: string;
+  projects: ProjectsPayload;
+  habits: HabitsPayload;
+  reminders: RemindersPayload;
+  checklists: ChecklistsPayload;
+};
+
+export type ImportMode = 'override' | 'merge';
+
+export function exportAllData(): BackupData {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    projects: readProjectsLS() ?? { projects: [makePersonalProject()] },
+    habits: readHabitsLS(),
+    reminders: readRemindersLS(),
+    checklists: readChecklistsLS(),
+  };
+}
+
+export function importAllData(raw: unknown, mode: ImportMode): void {
+  const data = (raw ?? {}) as Partial<BackupData>;
+
+  if (Array.isArray(data.projects?.projects)) {
+    if (mode === 'override') {
+      writeProjectsLS({
+        projects: data.projects!.projects,
+        selectedProjectId: data.projects!.selectedProjectId,
+      });
+    } else {
+      const current = readProjectsLS() ?? { projects: [makePersonalProject()] };
+      const incoming = data.projects!.projects.map(p => ({ ...p, project_id: pid() }));
+      writeProjectsLS({
+        projects: [...current.projects, ...incoming],
+        selectedProjectId: current.selectedProjectId,
+      });
+    }
+  }
+
+  if (Array.isArray(data.habits?.habits)) {
+    if (mode === 'override') {
+      writeHabitsLS(data.habits!);
+    } else {
+      const current = readHabitsLS();
+      const incoming = data.habits!.habits.map(h => ({ ...h, id: uid() }));
+      writeHabitsLS({ ...current, habits: [...current.habits, ...incoming] });
+    }
+  }
+
+  if (Array.isArray(data.reminders?.reminders)) {
+    if (mode === 'override') {
+      writeRemindersLS(data.reminders!);
+    } else {
+      const current = readRemindersLS();
+      const incoming = data.reminders!.reminders.map(r => ({ ...r, id: uid() }));
+      writeRemindersLS({ reminders: [...current.reminders, ...incoming] });
+    }
+  }
+
+  if (Array.isArray(data.checklists?.lists)) {
+    if (mode === 'override') {
+      writeChecklistsLS(data.checklists!);
+    } else {
+      const current = readChecklistsLS();
+      const incoming = data.checklists!.lists.map(l => ({
+        ...l,
+        id: uid(),
+        items: l.items.map(it => ({ ...it, id: uid() })),
+      }));
+      writeChecklistsLS({ ...current, lists: [...current.lists, ...incoming] });
+    }
+  }
+}
