@@ -447,7 +447,7 @@ function getFirebaseUid(): string {
 function dbPost(path: string, body: unknown): void {
   if (process.env.NEXT_PUBLIC_DATABASE_MODE === 'local') return;
   const uid = getFirebaseUid();
-  if (!uid) return;
+  if (!uid || uid === 'testuser') return;
   fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Firebase-UID': uid },
@@ -488,6 +488,7 @@ export async function loadFromDatabase(): Promise<void> {
   if (process.env.NEXT_PUBLIC_DATABASE_MODE === 'local') return;
   const uid = getFirebaseUid();
   if (!uid) return;
+  if (uid === 'testuser') return;
   const headers = { 'X-Firebase-UID': uid };
 
   try {

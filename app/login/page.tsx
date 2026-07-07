@@ -492,15 +492,12 @@ export default function LoginPage() {
       const loginId = email.trim().toLowerCase();
       if (loginId === 'testuser') {
         setPstate('exploding');
-        await safeUpsertPrismaUser({
-          email: 'testuser',
-          name: 'testuser',
-          avatarUrl: null,
-          firebaseUid: 'testuser',
-        });
+        localStorage.setItem('firebase_uid', 'testuser');
+        localStorage.setItem('prisma_user_id', 'local-testuser');
+        localStorage.setItem('prisma_user_email', 'testuser');
+        localStorage.setItem('prisma_user_name', 'testuser');
         setTrustedBrowser('testuser');
         sessionStorage.setItem('twofa_ok', '1');
-        localStorage.setItem('firebase_uid', 'testuser');
         router.replace('/assistant');
         return;
       }
