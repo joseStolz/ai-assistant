@@ -753,9 +753,21 @@ export function buildListSections(blocks: Block[]): ListSection[] {
 export function insertBlockAfter(blocks: Block[], afterId: string, newBlock: Block): Block[] {
   const i = blocks.findIndex(b => b.id === afterId);
   if (i < 0) return blocks;
-  const next = blocks.slice();
-  next.splice(i + 1, 0, newBlock);
-  return next;
+  const after = blocks[i];
+  // Inherit parentId from the block being inserted after so sortBlocksByOrder
+  // doesn't treat the new block as an orphan and append it to the end.
+  const toInsert: Block = { ...newBlock, parentId: newBlock.parentId ?? after.parentId };
+  const next = [...blocks.slice(0, i + 1), toInsert, ...blocks.slice(i + 1)];
+  // Renumber orders within each parent group to match array position so
+  // sortBlocksByOrder preserves the insertion order rather than moving the
+  // new block (order: 0) to the top.
+  const counters: Record<string, number> = {};
+  return next.map(b => {
+    const key = b.parentId ?? '__root__';
+    const order = counters[key] ?? 0;
+    counters[key] = order + 1;
+    return order === b.order ? b : { ...b, order };
+  });
 }
 
 export function removeBlock(blocks: Block[], id: string): Block[] {
