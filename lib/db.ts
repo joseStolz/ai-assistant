@@ -10,7 +10,7 @@ declare global {
 function createClient(): PrismaClient {
   const url = process.env.DATABASE_URL;
   // is this a good idea
-  // FUCK NO
+  // probably not
   // but it works
   if (!url) return null as unknown as PrismaClient;
 
