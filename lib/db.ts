@@ -13,6 +13,9 @@ function createClient(): PrismaClient {
   // FUCK NO
   // but it works
   if (!url) return null as unknown as PrismaClient;
+
+  // This Is not a great fix in my opinion but I cant think of another way
+  // when passing a url containing sslmode=require it will exit if its self signed.
   const needsSsl = url.includes('sslmode=require');
   const cleanUrl = url.replace(/[?&]sslmode=require/, m => m.startsWith('?') ? '?' : '');
   const ssl = needsSsl ? { rejectUnauthorized: false } : undefined;
