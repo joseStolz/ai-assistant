@@ -12,6 +12,8 @@ import {
   readSelectedProject,
   writeSelectedProjectBlocks,
   isListVisible,
+  isUncTitleBlock,
+  addTaskUnderList as addTaskUnderListArr,
   getTaskFlag,
   highestTaskFlag,
   type TaskFlagColor,
@@ -37,6 +39,11 @@ type DayGroup = {
   count: number;
   cards: CalCard[];
   listId: string;
+};
+
+type ListOption = {
+  id: string;
+  text: string;
 };
 
 /* ===================== Helpers ===================== */
@@ -142,20 +149,44 @@ const MONTH_NAMES = [
 function DaySidebar({
   ymd,
   groups,
+  listOptions,
   onClose,
   onToggleDone,
   onReschedule,
+  onAddTask,
   isLight,
 }: {
   ymd: string;
   groups: DayGroup[];
+  listOptions: ListOption[];
   onClose: () => void;
   onToggleDone: (id: string) => void;
   onReschedule: (id: string, newDate: string) => void;
+  onAddTask: (listId: string, text: string) => void;
   isLight: boolean;
 }) {
   const dateRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const diff = dayDiff(ymd);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [newTaskListId, setNewTaskListId] = useState('');
+  const [newTaskText, setNewTaskText] = useState('');
+  const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!addOpen) return;
+    if (!newTaskListId && listOptions.length) setNewTaskListId(listOptions[0].id);
+    requestAnimationFrame(() => newTaskInputRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addOpen]);
+
+  const submitNewTask = () => {
+    const text = newTaskText.trim();
+    if (!text || !newTaskListId) return;
+    onAddTask(newTaskListId, text);
+    setNewTaskText('');
+    requestAnimationFrame(() => newTaskInputRef.current?.focus());
+  };
 
   const dayLabel = (() => {
     if (diff === 0) return 'Today';
@@ -362,6 +393,83 @@ function DaySidebar({
             ))
           )}
         </div>
+
+        {/* Footer — add task */}
+        <div className="shrink-0 px-4 py-3" style={{ borderTop: '1px solid var(--assistant-border-soft)' }}>
+          {addOpen ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <select
+                  value={newTaskListId}
+                  onChange={e => setNewTaskListId(e.target.value)}
+                  className="text-[12px] rounded-lg px-2 py-2 flex-1 min-w-0"
+                  style={{
+                    background: 'var(--assistant-control-bg)',
+                    border: '1px solid var(--assistant-border-soft)',
+                    color: 'var(--assistant-text)',
+                  }}
+                >
+                  {listOptions.length === 0 && <option value="">No lists</option>}
+                  {listOptions.map(l => (
+                    <option key={l.id} value={l.id}>{l.text}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { setAddOpen(false); setNewTaskText(''); }}
+                  className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg transition-colors ${classes.panelBtn}`}
+                  title="Cancel"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={newTaskInputRef}
+                  type="text"
+                  value={newTaskText}
+                  onChange={e => setNewTaskText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); submitNewTask(); }
+                    if (e.key === 'Escape') { setAddOpen(false); setNewTaskText(''); }
+                  }}
+                  placeholder="Task name…"
+                  className="text-[13px] rounded-lg px-3 py-2 flex-1 min-w-0"
+                  style={{
+                    background: 'var(--assistant-surface)',
+                    border: '1px solid var(--assistant-border-soft)',
+                    color: 'var(--assistant-text)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={submitNewTask}
+                  disabled={!newTaskText.trim() || !newTaskListId}
+                  className="text-[12px] font-semibold px-3 py-2 rounded-lg shrink-0 transition-opacity disabled:opacity-40"
+                  style={{
+                    color: '#0a0a0a',
+                    background: '#d5fc43',
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5"
+              style={{
+                color: 'var(--assistant-tone-1)',
+                border: '1px solid color-mix(in srgb, var(--assistant-tone-1) 40%, transparent)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--assistant-tone-1) 16%, transparent) 0%, color-mix(in srgb, var(--assistant-tone-1) 8%, transparent) 100%)',
+              }}
+            >
+              <span className="text-[15px] leading-none">+</span> Add task
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
@@ -517,6 +625,30 @@ export default function CalendarView({ isLight = false }: { isLight?: boolean })
     }
     writeSelectedProjectBlocks(projectId, next);
     setBlocks(next);
+  };
+
+  /* ── Selectable lists (categories) for the "add task" footer ── */
+  const listOptions = useMemo<ListOption[]>(() => {
+    const seen = new Set<string>();
+    const out: ListOption[] = [];
+    for (const b of blocks) {
+      if (b.indent !== 0 || isUncTitleBlock(b) || b.archived) continue;
+      const text = (b.text || '').trim();
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id: b.id, text });
+    }
+    return out;
+  }, [blocks]);
+
+  const handleAddTask = (listId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !selectedDay) return;
+    const result = addTaskUnderListArr(blocks, listId, { text: trimmed, deadline: selectedDay });
+    writeSelectedProjectBlocks(projectId, result.blocks);
+    setBlocks(result.blocks);
   };
 
   /* ── Unique list titles (for color assignment) ── */
@@ -861,11 +993,13 @@ export default function CalendarView({ isLight = false }: { isLight?: boolean })
         <DaySidebar
           ymd={selectedDay}
           groups={selectedGroups}
+          listOptions={listOptions}
           isLight={isLight}
           onClose={() => setSelectedDay(null)}
           onToggleDone={id => {
             handleToggleDone(id);
           }}
+          onAddTask={handleAddTask}
           onReschedule={(id, date) => {
             handleReschedule(id, date);
             if (date.slice(0, 7) !== selectedDay.slice(0, 7)) {
