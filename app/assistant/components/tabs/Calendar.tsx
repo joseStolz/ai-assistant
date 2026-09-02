@@ -14,6 +14,7 @@ import {
   isListVisible,
   isUncTitleBlock,
   addTaskUnderList as addTaskUnderListArr,
+  removeTaskAndSubtasks,
   getTaskFlag,
   highestTaskFlag,
   type TaskFlagColor,
@@ -154,6 +155,7 @@ function DaySidebar({
   onToggleDone,
   onReschedule,
   onAddTask,
+  onDelete,
   isLight,
 }: {
   ymd: string;
@@ -163,10 +165,12 @@ function DaySidebar({
   onToggleDone: (id: string) => void;
   onReschedule: (id: string, newDate: string) => void;
   onAddTask: (listId: string, text: string) => void;
+  onDelete: (id: string) => void;
   isLight: boolean;
 }) {
   const dateRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const diff = dayDiff(ymd);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [newTaskListId, setNewTaskListId] = useState('');
@@ -362,7 +366,7 @@ function DaySidebar({
                           </span>
                         </div>
 
-                        {/* Reschedule — hide for archived */}
+                        {/* Reschedule + Delete — hide for archived */}
                         {!card.archived && (
                           <div className="shrink-0 flex items-center gap-1">
                             <button
@@ -380,6 +384,14 @@ function DaySidebar({
                               value={isValidDateYYYYMMDD(card.deadline) ? card.deadline : ''}
                               onChange={e => { if (e.target.value) onReschedule(card.id, e.target.value); }}
                             />
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmId(card.id)}
+                              className="text-[14px] opacity-40 hover:opacity-90 transition-opacity"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         )}
                         {card.archived && (
@@ -471,6 +483,48 @@ function DaySidebar({
           )}
         </div>
       </div>
+
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-300 flex items-center justify-center p-5">
+          <button
+            type="button"
+            className="fixed inset-0"
+            style={{ background: 'var(--assistant-overlay)' }}
+            onClick={() => setDeleteConfirmId(null)}
+            aria-label="Cancel"
+          />
+          <div
+            className="relative z-10 w-full max-w-[320px] rounded-2xl p-4 shadow-2xl"
+            style={{
+              background: 'var(--assistant-bg)',
+              color: 'var(--assistant-text)',
+              border: '1px solid var(--assistant-border-soft)',
+            }}
+          >
+            <h3 className="text-[14px] font-semibold mb-1.5">Delete task?</h3>
+            <p className="text-[12px] mb-4" style={{ color: 'var(--assistant-text-soft)' }}>
+              This can&apos;t be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="text-[12px] px-3 py-2 rounded-lg"
+                style={{ color: 'var(--assistant-text-muted)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { onDelete(deleteConfirmId); setDeleteConfirmId(null); }}
+                className="text-[12px] px-3 py-2 rounded-lg bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -610,6 +664,12 @@ export default function CalendarView({ isLight = false }: { isLight?: boolean })
       if (nextChecked) { b.deadline = t; b.isHidden = false; }
       break;
     }
+    writeSelectedProjectBlocks(projectId, next);
+    setBlocks(next);
+  };
+
+  const handleDelete = (cardId: string) => {
+    const next = removeTaskAndSubtasks(blocks, cardId);
     writeSelectedProjectBlocks(projectId, next);
     setBlocks(next);
   };
@@ -1000,6 +1060,7 @@ export default function CalendarView({ isLight = false }: { isLight?: boolean })
             handleToggleDone(id);
           }}
           onAddTask={handleAddTask}
+          onDelete={handleDelete}
           onReschedule={(id, date) => {
             handleReschedule(id, date);
             if (date.slice(0, 7) !== selectedDay.slice(0, 7)) {
